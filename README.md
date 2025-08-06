@@ -175,7 +175,7 @@ This project is licensed under the ISC License.
 
 ## 📞 Support
 
-For custom integrations or enterprise solutions, reach out on [Twitter](https://x.com/prathitjoshi_).
+For custom integrations or enterprise solutions, reach out on [Twitter](https://x.com/vishalpa8).
 
 ---
 
