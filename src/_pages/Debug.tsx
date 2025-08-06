@@ -14,6 +14,10 @@ import {
 } from "../components/ui/toast"
 import ExtraScreenshotsQueueHelper from "../components/Solutions/SolutionCommands"
 import { diffLines } from "diff"
+import { logger } from "../utils/logger"
+import { useErrorHandler } from "../hooks/useErrorHandler"
+import { useScreenshotManager } from "../hooks/useScreenshotManager"
+import { TOAST_TITLES } from "../utils/errorMessages"
 
 type DiffLine = {
   value: string
@@ -204,6 +208,8 @@ interface DebugProps {
 const Debug: React.FC<DebugProps> = ({ isProcessing, setIsProcessing }) => {
   const queryClient = useQueryClient()
   const contentRef = useRef<HTMLDivElement>(null)
+  const { handleError, handleAsyncOperation } = useErrorHandler()
+  const { screenshots: extraScreenshots, deleteScreenshot, refetch } = useScreenshotManager('debug-extras')
 
   const [oldCode, setOldCode] = useState<string | null>(null)
   const [newCode, setNewCode] = useState<string | null>(null)
@@ -225,21 +231,6 @@ const Debug: React.FC<DebugProps> = ({ isProcessing, setIsProcessing }) => {
   const [isTooltipVisible, setIsTooltipVisible] = useState(false)
   const [tooltipHeight, setTooltipHeight] = useState(0)
 
-  const { data: extraScreenshots = [], refetch } = useQuery({
-    queryKey: ["extras"],
-    queryFn: async () => {
-      try {
-        const existing = await window.electronAPI.getScreenshots()
-        return existing
-      } catch (error) {
-        console.error("Error loading extra screenshots:", error)
-        return []
-      }
-    },
-    staleTime: Infinity,
-    cacheTime: Infinity
-  })
-
   const showToast = (
     title: string,
     description: string,
@@ -250,21 +241,11 @@ const Debug: React.FC<DebugProps> = ({ isProcessing, setIsProcessing }) => {
   }
 
   const handleDeleteExtraScreenshot = async (index: number) => {
-    const screenshotToDelete = extraScreenshots[index]
-
-    try {
-      const response = await window.electronAPI.deleteScreenshot(
-        screenshotToDelete.path
-      )
-
-      if (response.success) {
-        refetch()
-      } else {
-        console.error("Failed to delete extra screenshot:", response.error)
-      }
-    } catch (error) {
-      console.error("Error deleting extra screenshot:", error)
-    }
+    await deleteScreenshot(
+      index,
+      () => logger.log('Debug screenshot deleted successfully'),
+      (error) => showToast(TOAST_TITLES.DELETE_FAILED, error, 'error')
+    );
   }
 
   useEffect(() => {
@@ -304,7 +285,7 @@ const Debug: React.FC<DebugProps> = ({ isProcessing, setIsProcessing }) => {
           "error"
         )
         setIsProcessing(false)
-        console.error("Processing error:", error)
+        handleError(error, 'Debug processing');
       })
     ]
 

@@ -43,9 +43,17 @@ declare global {
       analyzeAudioFromBase64: (data: string, mimeType: string) => Promise<{ text: string; timestamp: number }>
       analyzeAudioFile: (path: string) => Promise<{ text: string; timestamp: number }>
 
+      // Ask functionality
+      askQuestion: (question: string) => Promise<{ success: boolean; answer?: { text: string; timestamp: number }; error?: string }>
+
       moveWindowLeft: () => Promise<void>
       moveWindowRight: () => Promise<void>
       quitApp: () => Promise<void>
+      hideWindow: () => Promise<void>
+      solutionStart: () => Promise<void>
+      
+      // Platform info
+      platform: string
     }
   }
 }

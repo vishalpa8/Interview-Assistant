@@ -16,6 +16,11 @@ import { ProblemStatementData } from "../types/solutions"
 import { AudioResult } from "../types/audio"
 import SolutionCommands from "../components/Solutions/SolutionCommands"
 import Debug from "./Debug"
+import { logger } from "../utils/logger"
+import { useErrorHandler } from "../hooks/useErrorHandler"
+import { useScreenshotManager } from "../hooks/useScreenshotManager"
+import { createAudioError, createAudioResult } from "../utils/audioUtils"
+import { ERROR_MESSAGES, TOAST_TITLES } from "../utils/errorMessages"
 
 // (Using global ElectronAPI type from src/types/electron.d.ts)
 
@@ -33,8 +38,13 @@ export const ContentSection = ({
       {title}
     </h2>
     {isLoading ? (
-      <div className="mt-4 flex">
-        <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
+      <div className="mt-4 flex items-center gap-3">
+        <div className="flex space-x-1">
+          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+        </div>
+        <p className="text-sm text-blue-400 font-medium">
           Extracting problem statement...
         </p>
       </div>
@@ -60,9 +70,14 @@ const SolutionSection = ({
     </h2>
     {isLoading ? (
       <div className="space-y-1.5">
-        <div className="mt-4 flex">
-          <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
-            Loading solutions...
+        <div className="mt-4 flex items-center gap-3">
+          <div className="flex space-x-1">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-bounce"></div>
+          </div>
+          <p className="text-sm text-green-400 font-medium">
+            Generating solution...
           </p>
         </div>
       </div>
@@ -102,9 +117,16 @@ export const ComplexitySection = ({
       Complexity (Updated)
     </h2>
     {isLoading ? (
-      <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
-        Calculating complexity...
-      </p>
+      <div className="flex items-center gap-3">
+        <div className="flex space-x-1">
+          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
+        </div>
+        <p className="text-sm text-purple-400 font-medium">
+          Calculating complexity...
+        </p>
+      </div>
     ) : (
       <div className="space-y-1">
         <div className="flex items-start gap-2 text-[13px] leading-[1.4] text-gray-100">
@@ -130,6 +152,8 @@ interface SolutionsProps {
 const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
   const queryClient = useQueryClient()
   const contentRef = useRef<HTMLDivElement>(null)
+  const { handleError, handleAsyncOperation } = useErrorHandler()
+  const { screenshots: extraScreenshots, deleteScreenshot, refetch } = useScreenshotManager('extras')
 
   // Audio recording state
   const [audioRecording, setAudioRecording] = useState(false)
@@ -160,23 +184,6 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
 
   const [isResetting, setIsResetting] = useState(false)
 
-  const { data: extraScreenshots = [], refetch } = useQuery<Array<{ path: string; preview: string }>, Error>(
-    ["extras"],
-    async () => {
-      try {
-        const existing = await window.electronAPI.getScreenshots()
-        return existing
-      } catch (error) {
-        console.error("Error loading extra screenshots:", error)
-        return []
-      }
-    },
-    {
-      staleTime: Infinity,
-      cacheTime: Infinity
-    }
-  )
-
   const showToast = (
     title: string,
     description: string,
@@ -187,21 +194,11 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
   }
 
   const handleDeleteExtraScreenshot = async (index: number) => {
-    const screenshotToDelete = extraScreenshots[index]
-
-    try {
-      const response = await window.electronAPI.deleteScreenshot(
-        screenshotToDelete.path
-      )
-
-      if (response.success) {
-        refetch() // Refetch screenshots instead of managing state directly
-      } else {
-        console.error("Failed to delete extra screenshot:", response.error)
-      }
-    } catch (error) {
-      console.error("Error deleting extra screenshot:", error)
-    }
+    await deleteScreenshot(
+      index,
+      () => logger.log('Screenshot deleted successfully'),
+      (error) => showToast(TOAST_TITLES.DELETE_FAILED, error, 'error')
+    );
   }
 
   useEffect(() => {
@@ -279,15 +276,22 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
                 )
                 // Store result in react-query cache
                 queryClient.setQueryData(["audio_result"], result)
-                setAudioResult(result)
+                setAudioResult(createAudioResult(result.text))
               } catch (err) {
-                console.error('Audio analysis failed:', err)
+                handleError(err, 'Audio analysis');
+                const errorResult = createAudioError(ERROR_MESSAGES.AUDIO_ANALYSIS_FAILED);
+                setAudioResult(errorResult);
               }
             }
             reader.readAsDataURL(blob)
           }
         } catch (err) {
-          console.error('Audio recording error:', err)
+          handleError(err, 'Audio recording');
+          showToast(
+            TOAST_TITLES.RECORDING_FAILED,
+            ERROR_MESSAGES.AUDIO_RECORDING_FAILED,
+            'error'
+          );
         }
 
         // Simulate receiving custom content shortly after start
@@ -318,16 +322,21 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
         setThoughtsData(solution?.thoughts || null)
         setTimeComplexityData(solution?.time_complexity || null)
         setSpaceComplexityData(solution?.space_complexity || null)
-        console.error("Processing error:", error)
+        handleError(error, 'Solution processing');
       }),
       //when the initial solution is generated, we'll set the solution data to that
       window.electronAPI.onSolutionSuccess((data) => {
         if (!data?.solution) {
-          console.warn("Received empty or invalid solution data")
+          logger.warn('Received empty or invalid solution data', data);
+          showToast(
+            TOAST_TITLES.INVALID_DATA,
+            ERROR_MESSAGES.SOLUTION_INVALID_DATA,
+            'error'
+          );
           return
         }
 
-        console.log({ solution: data.solution })
+
 
         const solutionData = {
           code: data.solution.code,
@@ -352,7 +361,7 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
       }),
       //the first time debugging works, we'll set the view to debug and populate the cache with the data
       window.electronAPI.onDebugSuccess((data) => {
-        console.log({ debug_data: data })
+
 
         queryClient.setQueryData(["new_solution"], data.solution)
         setDebugProcessing(false)
@@ -506,12 +515,26 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
                     />
                     {/* Show loading state when waiting for solution */}
                     {problemStatementData && !solutionData && (
-                      <div className="mt-4 flex">
-                        <p className="text-xs bg-gradient-to-r from-gray-300 via-gray-100 to-gray-300 bg-clip-text text-transparent animate-pulse">
-                          {problemStatementData?.output_format?.subtype === "voice" 
-                            ? "Processing voice input..." 
-                            : "Generating solutions..."}
-                        </p>
+                      <div className="mt-6 p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/20">
+                        <div className="flex items-center gap-4">
+                          <div className="flex space-x-1">
+                            <div className="w-3 h-3 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                            <div className="w-3 h-3 bg-purple-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                            <div className="w-3 h-3 bg-blue-400 rounded-full animate-bounce"></div>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-base font-medium text-white mb-1">
+                              {problemStatementData?.output_format?.subtype === "voice" 
+                                ? "Processing Voice Input" 
+                                : "Generating Solution"}
+                            </p>
+                            <p className="text-sm text-gray-300">
+                              {problemStatementData?.output_format?.subtype === "voice" 
+                                ? "Analyzing your voice input and preparing response..." 
+                                : "Analyzing problem statement and generating optimized solution..."}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     )}
                     {/* Solution Sections (legacy, only for non-manual) */}

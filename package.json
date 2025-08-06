@@ -1,5 +1,5 @@
 {
-  "name": "interview-assistant"
+  "name": "interview-assistant",
   "version": "1.0.0",
   "main": "./dist-electron/main.js",
   "scripts": {
@@ -11,6 +11,7 @@
     "electron:dev:watch": "concurrently --kill-others --names \"VITE,TS-WATCH,ELECTRON\" --prefix-colors \"blue,yellow,green\" \"vite\" \"tsc -p electron/tsconfig.json --watch\" \"wait-on http://localhost:5173 && wait-on dist-electron/main.js && electron .\"",
     "app:dev": "npm run electron:dev",
     "app:build": "npm run build && electron-builder",
+    "app:prod": "cross-env NODE_ENV=production npm run build && cross-env NODE_ENV=production electron .",
     "watch": "tsc -p electron/tsconfig.json --watch",
     "dev:full": "npm run electron:dev:watch"
   },
@@ -88,8 +89,7 @@
     "wait-on": "^8.0.1"
   },
   "dependencies": {
-    "@google/genai": "^0.12.0",
-    "@google/generative-ai": "^0.2.1",
+    "@google/generative-ai": "^0.21.0",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-toast": "^1.2.2",
     "axios": "^1.7.7",

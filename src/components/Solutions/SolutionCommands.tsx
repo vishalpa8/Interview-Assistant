@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react"
 import { IoLogOutOutline } from "react-icons/io5"
+import { useOSDetection } from "../../utils/osDetection"
 
 interface SolutionCommandsProps {
   extraScreenshots: any[]
@@ -12,6 +13,9 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
 }) => {
   const [isTooltipVisible, setIsTooltipVisible] = useState(false)
   const tooltipRef = useRef<HTMLDivElement>(null)
+  const { currentOS, getOSKey, getModifierText } = useOSDetection()
+
+
 
   useEffect(() => {
     if (onTooltipVisibilityChange) {
@@ -31,6 +35,8 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
     setIsTooltipVisible(false)
   }
 
+
+
   return (
     <div>
       <div className="pt-2 w-fit">
@@ -40,7 +46,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
             <span className="text-[11px] leading-none">Show/Hide</span>
             <div className="flex gap-1">
               <button className="bg-white/10 hover:bg-white/20 transition-colors rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
-                ⌘
+                {getOSKey('Ctrl')}
               </button>
               <button className="bg-white/10 hover:bg-white/20 transition-colors rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
                 B
@@ -57,7 +63,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
             </span>
             <div className="flex gap-1">
               <button className="bg-white/10 hover:bg-white/20 transition-colors rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
-                ⌘
+                {getOSKey('Ctrl')}
               </button>
               <button className="bg-white/10 hover:bg-white/20 transition-colors rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
                 H
@@ -69,7 +75,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
               <span className="text-[11px] leading-none">Debug</span>
               <div className="flex gap-1">
                 <button className="bg-white/10 hover:bg-white/20 transition-colors rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
-                  ⌘
+                  {getOSKey('Ctrl')}
                 </button>
                 <button className="bg-white/10 hover:bg-white/20 transition-colors rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
                   ↵
@@ -83,7 +89,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
             <span className="text-[11px] leading-none">Start over</span>
             <div className="flex gap-1">
               <button className="bg-white/10 hover:bg-white/20 transition-colors rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
-                ⌘
+                {getOSKey('Ctrl')}
               </button>
               <button className="bg-white/10 hover:bg-white/20 transition-colors rounded-md px-1.5 py-1 text-[11px] leading-none text-white/70">
                 R
@@ -124,7 +130,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
                           </span>
                           <div className="flex gap-1">
                             <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
-                              ⌘
+                              {getModifierText()}
                             </span>
                             <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
                               B
@@ -143,7 +149,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
                           </span>
                           <div className="flex gap-1">
                             <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
-                              ⌘
+                              {getModifierText()}
                             </span>
                             <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
                               H
@@ -162,7 +168,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
                           <span className="whitespace-nowrap">Debug</span>
                           <div className="flex gap-1">
                             <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
-                              ⌘
+                              {getModifierText()}
                             </span>
                             <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
                               ↵
@@ -180,7 +186,7 @@ const SolutionCommands: React.FC<SolutionCommandsProps> = ({
                           <span className="whitespace-nowrap">Start Over</span>
                           <div className="flex gap-1">
                             <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
-                              ⌘
+                              {getModifierText()}
                             </span>
                             <span className="bg-white/10 px-1.5 py-0.5 rounded text-[10px] leading-none">
                               R

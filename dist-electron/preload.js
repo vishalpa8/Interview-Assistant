@@ -1,116 +1,85 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PROCESSING_EVENTS = void 0;
 const electron_1 = require("electron");
-exports.PROCESSING_EVENTS = {
-    //global states
-    UNAUTHORIZED: "procesing-unauthorized",
-    NO_SCREENSHOTS: "processing-no-screenshots",
-    //states for generating the initial solution
-    INITIAL_START: "initial-start",
-    PROBLEM_EXTRACTED: "problem-extracted",
-    SOLUTION_SUCCESS: "solution-success",
-    INITIAL_SOLUTION_ERROR: "solution-error",
-    //states for processing the debugging
-    DEBUG_START: "debug-start",
-    DEBUG_SUCCESS: "debug-success",
-    DEBUG_ERROR: "debug-error"
-};
-// Expose the Electron API to the renderer process
-electron_1.contextBridge.exposeInMainWorld("electronAPI", {
-    updateContentDimensions: (dimensions) => electron_1.ipcRenderer.invoke("update-content-dimensions", dimensions),
-    takeScreenshot: () => electron_1.ipcRenderer.invoke("take-screenshot"),
-    getScreenshots: () => electron_1.ipcRenderer.invoke("get-screenshots"),
-    deleteScreenshot: (path) => electron_1.ipcRenderer.invoke("delete-screenshot", path),
-    // Event listeners
+// Expose the complete electronAPI that the React app expects
+electron_1.contextBridge.exposeInMainWorld('electronAPI', {
+    // Window management
+    updateContentDimensions: (dimensions) => electron_1.ipcRenderer.invoke('update-content-dimensions', dimensions),
+    // Screenshot functionality
+    getScreenshots: () => electron_1.ipcRenderer.invoke('get-screenshots'),
+    takeScreenshot: () => electron_1.ipcRenderer.invoke('take-screenshot'),
+    deleteScreenshot: (path) => electron_1.ipcRenderer.invoke('delete-screenshot', path),
+    // Event listeners for screenshots
     onScreenshotTaken: (callback) => {
         const subscription = (_, data) => callback(data);
-        electron_1.ipcRenderer.on("screenshot-taken", subscription);
-        return () => {
-            electron_1.ipcRenderer.removeListener("screenshot-taken", subscription);
-        };
+        electron_1.ipcRenderer.on('screenshot-taken', subscription);
+        return () => electron_1.ipcRenderer.removeListener('screenshot-taken', subscription);
     },
-    onSolutionsReady: (callback) => {
-        const subscription = (_, solutions) => callback(solutions);
-        electron_1.ipcRenderer.on("solutions-ready", subscription);
-        return () => {
-            electron_1.ipcRenderer.removeListener("solutions-ready", subscription);
-        };
-    },
-    onResetView: (callback) => {
+    // Global events
+    onUnauthorized: (callback) => {
         const subscription = () => callback();
-        electron_1.ipcRenderer.on("reset-view", subscription);
-        return () => {
-            electron_1.ipcRenderer.removeListener("reset-view", subscription);
-        };
-    },
-    onSolutionStart: (callback) => {
-        const subscription = () => callback();
-        electron_1.ipcRenderer.on(exports.PROCESSING_EVENTS.INITIAL_START, subscription);
-        return () => {
-            electron_1.ipcRenderer.removeListener(exports.PROCESSING_EVENTS.INITIAL_START, subscription);
-        };
-    },
-    onDebugStart: (callback) => {
-        const subscription = () => callback();
-        electron_1.ipcRenderer.on(exports.PROCESSING_EVENTS.DEBUG_START, subscription);
-        return () => {
-            electron_1.ipcRenderer.removeListener(exports.PROCESSING_EVENTS.DEBUG_START, subscription);
-        };
-    },
-    onDebugSuccess: (callback) => {
-        electron_1.ipcRenderer.on("debug-success", (_event, data) => callback(data));
-        return () => {
-            electron_1.ipcRenderer.removeListener("debug-success", (_event, data) => callback(data));
-        };
-    },
-    onDebugError: (callback) => {
-        const subscription = (_, error) => callback(error);
-        electron_1.ipcRenderer.on(exports.PROCESSING_EVENTS.DEBUG_ERROR, subscription);
-        return () => {
-            electron_1.ipcRenderer.removeListener(exports.PROCESSING_EVENTS.DEBUG_ERROR, subscription);
-        };
-    },
-    onSolutionError: (callback) => {
-        const subscription = (_, error) => callback(error);
-        electron_1.ipcRenderer.on(exports.PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR, subscription);
-        return () => {
-            electron_1.ipcRenderer.removeListener(exports.PROCESSING_EVENTS.INITIAL_SOLUTION_ERROR, subscription);
-        };
+        electron_1.ipcRenderer.on('unauthorized', subscription);
+        return () => electron_1.ipcRenderer.removeListener('unauthorized', subscription);
     },
     onProcessingNoScreenshots: (callback) => {
         const subscription = () => callback();
-        electron_1.ipcRenderer.on(exports.PROCESSING_EVENTS.NO_SCREENSHOTS, subscription);
-        return () => {
-            electron_1.ipcRenderer.removeListener(exports.PROCESSING_EVENTS.NO_SCREENSHOTS, subscription);
-        };
+        electron_1.ipcRenderer.on('processing-no-screenshots', subscription);
+        return () => electron_1.ipcRenderer.removeListener('processing-no-screenshots', subscription);
     },
-    onProblemExtracted: (callback) => {
-        const subscription = (_, data) => callback(data);
-        electron_1.ipcRenderer.on(exports.PROCESSING_EVENTS.PROBLEM_EXTRACTED, subscription);
-        return () => {
-            electron_1.ipcRenderer.removeListener(exports.PROCESSING_EVENTS.PROBLEM_EXTRACTED, subscription);
-        };
+    onResetView: (callback) => {
+        const subscription = () => callback();
+        electron_1.ipcRenderer.on('reset-view', subscription);
+        return () => electron_1.ipcRenderer.removeListener('reset-view', subscription);
+    },
+    // Solution processing events
+    onSolutionStart: (callback) => {
+        const subscription = () => callback();
+        electron_1.ipcRenderer.on('solution-start', subscription);
+        return () => electron_1.ipcRenderer.removeListener('solution-start', subscription);
+    },
+    onSolutionError: (callback) => {
+        const subscription = (_, error) => callback(error);
+        electron_1.ipcRenderer.on('solution-error', subscription);
+        return () => electron_1.ipcRenderer.removeListener('solution-error', subscription);
     },
     onSolutionSuccess: (callback) => {
         const subscription = (_, data) => callback(data);
-        electron_1.ipcRenderer.on(exports.PROCESSING_EVENTS.SOLUTION_SUCCESS, subscription);
-        return () => {
-            electron_1.ipcRenderer.removeListener(exports.PROCESSING_EVENTS.SOLUTION_SUCCESS, subscription);
-        };
+        electron_1.ipcRenderer.on('solution-success', subscription);
+        return () => electron_1.ipcRenderer.removeListener('solution-success', subscription);
     },
-    onUnauthorized: (callback) => {
+    onProblemExtracted: (callback) => {
+        const subscription = (_, data) => callback(data);
+        electron_1.ipcRenderer.on('problem-extracted', subscription);
+        return () => electron_1.ipcRenderer.removeListener('problem-extracted', subscription);
+    },
+    // Debug events
+    onDebugStart: (callback) => {
         const subscription = () => callback();
-        electron_1.ipcRenderer.on(exports.PROCESSING_EVENTS.UNAUTHORIZED, subscription);
-        return () => {
-            electron_1.ipcRenderer.removeListener(exports.PROCESSING_EVENTS.UNAUTHORIZED, subscription);
-        };
+        electron_1.ipcRenderer.on('debug-start', subscription);
+        return () => electron_1.ipcRenderer.removeListener('debug-start', subscription);
     },
-    moveWindowLeft: () => electron_1.ipcRenderer.invoke("move-window-left"),
-    moveWindowRight: () => electron_1.ipcRenderer.invoke("move-window-right"),
-    analyzeAudioFromBase64: (data, mimeType) => electron_1.ipcRenderer.invoke("analyze-audio-base64", data, mimeType),
-    analyzeAudioFile: (path) => electron_1.ipcRenderer.invoke("analyze-audio-file", path),
-    analyzeImageFile: (path) => electron_1.ipcRenderer.invoke("analyze-image-file", path),
-    quitApp: () => electron_1.ipcRenderer.invoke("quit-app")
+    onDebugSuccess: (callback) => {
+        const subscription = (_, data) => callback(data);
+        electron_1.ipcRenderer.on('debug-success', subscription);
+        return () => electron_1.ipcRenderer.removeListener('debug-success', subscription);
+    },
+    onDebugError: (callback) => {
+        const subscription = (_, error) => callback(error);
+        electron_1.ipcRenderer.on('debug-error', subscription);
+        return () => electron_1.ipcRenderer.removeListener('debug-error', subscription);
+    },
+    // Audio processing
+    analyzeAudioFromBase64: (data, mimeType) => electron_1.ipcRenderer.invoke('analyze-audio-base64', data, mimeType),
+    analyzeAudioFile: (path) => electron_1.ipcRenderer.invoke('analyze-audio-file', path),
+    // Ask functionality
+    askQuestion: (question) => electron_1.ipcRenderer.invoke('ask-question', question),
+    // Window movement
+    moveWindowLeft: () => electron_1.ipcRenderer.invoke('move-window-left'),
+    moveWindowRight: () => electron_1.ipcRenderer.invoke('move-window-right'),
+    // App control
+    quitApp: () => electron_1.ipcRenderer.invoke('quit-app'),
+    hideWindow: () => electron_1.ipcRenderer.invoke('hide-window'),
+    solutionStart: () => electron_1.ipcRenderer.invoke('solution-start'),
+    // Platform info
+    platform: process.platform,
 });
-//# sourceMappingURL=preload.js.map
