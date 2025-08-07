@@ -5,18 +5,19 @@ import { FaMicrophone, FaMicrophoneSlash } from "react-icons/fa";
 import { BiSend } from "react-icons/bi";
 import { AiOutlineQuestionCircle } from "react-icons/ai";
 import { BsCamera, BsGear } from "react-icons/bs";
+import { IoClose } from "react-icons/io5";
+import SmartResponseDisplay from "../SmartResponseDisplay";
 import { MdPlayArrow } from "react-icons/md";
 import { useOSDetection } from "../../utils/osDetection";
 import { createAudioError, createAudioResult } from "../../utils/audioUtils";
 import { ERROR_MESSAGES } from "../../utils/errorMessages";
+import { useUniversalAI } from "../../hooks/useUniversalAI";
 
 interface QueueCommandsProps {
-  onTooltipVisibilityChange: (visible: boolean, height: number) => void;
   screenshots: Array<{ path: string; preview: string }>;
 }
 
 const QueueCommands: React.FC<QueueCommandsProps> = ({
-  onTooltipVisibilityChange,
   screenshots,
 }) => {
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
@@ -29,28 +30,53 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
   const chunks = useRef<Blob[]>([]);
   const [showAskInput, setShowAskInput] = useState(false);
   const [askQuestion, setAskQuestion] = useState("");
-  const [askResult, setAskResult] = useState<string | null>(null);
+
+  
+
   const [isProcessing, setIsProcessing] = useState(false);
   const { currentOS, getOSKey, getModifierText } = useOSDetection();
   
   // Reset function to clear all results
   const resetAllResults = () => {
     setAudioResult(null);
-    setAskResult(null);
+    clearResult();
     setShowAskInput(false);
     setAskQuestion("");
     setIsProcessing(false);
   };
-  const [isAsking, setIsAsking] = useState(false);
+  const [thinkingMessage, setThinkingMessage] = useState('AI is thinking...');
   const askInputRef = useRef<HTMLInputElement>(null);
+  
+  // Use the universal AI hook with streaming enabled
+  const {
+    isProcessing: isAsking,
+    isStreaming,
+    result: askResult,
+    error: askError,
+    processText,
+    processImages,
+    processAudio,
+    clearResult,
+    availableModels
+  } = useUniversalAI({ 
+    enableStreaming: true,
+    model: 'llama3.2-vision'
+  });
 
   useEffect(() => {
     let tooltipHeight = 0;
-    if (tooltipRef.current && isTooltipVisible) {
-      tooltipHeight = tooltipRef.current.offsetHeight + 10;
+    if (isTooltipVisible) {
+      tooltipHeight = 120; // Approximate height of tooltip
     }
-    onTooltipVisibilityChange(isTooltipVisible, tooltipHeight);
+    
+    const contentHeight = 100 + tooltipHeight; // Base height + tooltip
+    window.electronAPI?.updateContentDimensions({
+      width: 600,
+      height: contentHeight
+    });
   }, [isTooltipVisible]);
+
+
 
   // Listen for events
   useEffect(() => {
@@ -140,29 +166,42 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
 
   const handleAskClick = () => {
     setShowAskInput(true);
-    setAskResult(null);
+    clearResult(); // Clear previous results
     setTimeout(() => {
       askInputRef.current?.focus();
     }, 100);
   };
 
+
+
   const handleAskSubmit = async () => {
     if (!askQuestion.trim() || isAsking) return;
     
-    setIsAsking(true);
+    // Show progressive thinking messages
+    const messages = [
+      'AI is thinking...',
+      'Analyzing your question...',
+      'Processing with llama3.2-vision...',
+      'Generating response...',
+      'Almost ready...'
+    ];
+    
+    let messageIndex = 0;
+    const messageInterval = setInterval(() => {
+      setThinkingMessage(messages[messageIndex % messages.length]);
+      messageIndex++;
+    }, 3000);
+    
     try {
-      const result = await window.electronAPI.askQuestion(askQuestion);
-      if (result.success && result.answer) {
-        setAskResult(result.answer.text);
-      } else {
-        setAskResult(result.error || "Failed to get answer");
-      }
-    } catch (error) {
-      setAskResult("Error asking question");
-    } finally {
-      setIsAsking(false);
+      await processText(askQuestion);
+      // Clear the input after successful submission
       setAskQuestion("");
-      setShowAskInput(false);
+    } catch (error) {
+      // Error handling is done by the hook
+    } finally {
+      clearInterval(messageInterval);
+      setThinkingMessage('AI is thinking...');
+      // Keep the input visible so user can see the result and ask more questions
     }
   };
 
@@ -170,9 +209,14 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
     if (e.key === 'Enter') {
       handleAskSubmit();
     } else if (e.key === 'Escape') {
-      setShowAskInput(false);
-      setAskQuestion("");
+      handleCloseAsk();
     }
+  };
+
+  const handleCloseAsk = () => {
+    setShowAskInput(false);
+    setAskQuestion("");
+    clearResult();
   };
 
 
@@ -216,6 +260,7 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
             <AiOutlineQuestionCircle className="w-3 h-3" />
             <span>Ask</span>
           </button>
+
         </div>
 
         {/* Screenshot */}
@@ -480,6 +525,17 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
       {/* Ask Input Popup */}
       {showAskInput && (
         <div className="mt-2 p-3 bg-black/80 backdrop-blur-md rounded-lg border border-white/10">
+          <div className="flex items-start justify-between mb-2">
+            <h4 className="text-white text-xs font-medium">Ask AI Assistant</h4>
+            <button
+              onClick={handleCloseAsk}
+              className="text-white/50 hover:text-white/80 transition-colors"
+              title="Close (Escape)"
+            >
+              <IoClose className="w-4 h-4" />
+            </button>
+          </div>
+          
           <div className="flex items-center gap-2">
             <input
               ref={askInputRef}
@@ -508,17 +564,42 @@ const QueueCommands: React.FC<QueueCommandsProps> = ({
             </button>
           </div>
           <div className="mt-1 text-[10px] text-white/50">
-            Press Enter to submit, Escape to cancel
+            Press Enter to submit, Escape to close
           </div>
+          
+          {/* Show thinking indicator when processing - below input */}
+          {isAsking && (
+            <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="flex space-x-1">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs font-medium text-blue-400 mb-1">
+                    🤖 {thinkingMessage}
+                  </p>
+                  <p className="text-[10px] text-blue-300/80">
+                    Using local llama3.2-vision model
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Ask Result Display */}
-      {askResult && (
-        <div className="mt-2 p-2 bg-blue-500/10 border border-blue-500/20 rounded text-white text-xs max-w-md">
-          <span className="font-semibold text-blue-400">Answer:</span> {askResult}
-        </div>
+      {(askResult || askError) && (
+        <SmartResponseDisplay 
+          response={askResult || askError || ''} 
+          onClose={clearResult}
+          isStreaming={isStreaming}
+        />
       )}
+      
+
 
       {/* Audio Result Display */}
       {audioResult && (

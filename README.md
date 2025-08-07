@@ -1,16 +1,56 @@
 # Interview Assistant
 
-An intelligent desktop application that helps you excel in technical interviews and coding challenges using AI-powered analysis, screenshot capture, and voice recording capabilities.
+Intelligent interview assistant with screenshot analysis, voice recording, and AI-powered solution generation using **local Ollama AI** - no internet required!
 
-## ✨ Features
+## 🚀 New: Local AI Integration with Ollama
 
-- **📸 Smart Screenshot Analysis**: Capture and analyze problem statements from any screen
-- **🎤 Voice Recording**: Record and transcribe audio for problem analysis
-- **🤖 AI-Powered Solutions**: Generate intelligent solutions using Google's Gemini AI
-- **🔄 Real-time Processing**: Instant analysis and solution generation
-- **⌨️ Keyboard Shortcuts**: Quick access to all features
-- **🎯 Transparent Overlay**: Unobtrusive interface that stays on top
-- **🔧 Error Management**: Robust error handling with detailed logging
+This application now uses **Ollama** with **llama3.2-vision** for completely local AI processing:
+- ✅ **No API keys required**
+- ✅ **No internet connection needed**
+- ✅ **Complete privacy** - all data stays on your machine
+- ✅ **Real-time processing feedback**
+- ✅ **Multi-modal AI** - handles images, text, and audio
+
+### Quick Setup
+1. Install Ollama: [https://ollama.ai](https://ollama.ai)
+2. Start Ollama: `ollama serve`
+3. Install models: `ollama pull llama3.2-vision && ollama pull llama3.2`
+4. Launch the app and see the green connection status!
+
+See [OLLAMA_SETUP.md](./OLLAMA_SETUP.md) for detailed setup instructions.
+
+## Features
+
+### 🖼️ Advanced Screenshot Analysis
+- **Multi-screenshot processing**: Analyze multiple screens simultaneously
+- **Technical content extraction**: Identifies code, UI elements, error messages
+- **Problem statement detection**: Extracts interview questions and requirements
+- **Real-time visual feedback**: See exactly what the AI is analyzing
+
+### 🧠 Local AI Processing
+- **llama3.2-vision**: Advanced vision model for image understanding
+- **llama3.2**: Powerful language model for solution generation
+- **No external dependencies**: Everything runs on your machine
+- **Thinking indicators**: Real-time feedback showing AI processing stages
+
+### 💬 Interactive Q&A
+- **Natural conversation**: Ask follow-up questions
+- **Context-aware responses**: Maintains conversation context
+- **Instant responses**: No network latency
+
+### 🎤 Audio Processing (Planned)
+- **Voice questions**: Transcribe spoken questions
+- **Audio analysis**: Process audio input for additional context
+
+### 🔒 Privacy & Security
+- **Complete local processing**: No data leaves your machine
+- **No API keys required**: No external service dependencies
+- **Offline capable**: Works without internet connection
+
+### 👻 Ghost Mode
+- **Invisible operation**: Stealth mode during interviews
+- **Global shortcuts**: Control without showing the window
+- **Minimal footprint**: Designed to be undetectable
 
 ## 🚀 Quick Start Guide
 
@@ -19,45 +59,49 @@ An intelligent desktop application that helps you excel in technical interviews 
 - **Git**
 - **Gemini API Key** - Get it from [Google AI Studio](https://makersuite.google.com/app/apikey)
 
-### Installation
+## Installation
 
-1. **Clone the repository:**
-```bash
-git clone [repository-url]
-cd interview-assistant
-```
-
-2. **Install dependencies:**
-```bash
-npm install
-```
-
-3. **Set up environment variables:**
-   - Create a `.env` file in the root directory
-   - Add your Gemini API key:
-   ```env
-   GEMINI_API_KEY=your_api_key_here
+### Prerequisites
+1. **Install Ollama**: Download from [https://ollama.ai](https://ollama.ai)
+2. **Start Ollama service**: `ollama serve`
+3. **Install AI models**:
+   ```bash
+   ollama pull llama3.2-vision  # For image analysis
+   ollama pull llama3.2         # For text generation
    ```
 
-### Running the Application
+### Application Setup
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd interview-assistant
+   ```
 
-#### Development Mode (Recommended)
-```bash
-npm run electron:dev
-```
-This will start both the Vite dev server and Electron application automatically.
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-#### Development with Auto-Reload
-```bash
-npm run dev:full
-```
-This includes TypeScript watching for automatic recompilation on changes.
+3. **Configure environment** (optional)
+   ```bash
+   cp .env.example .env
+   # Edit .env to customize Ollama settings
+   ```
 
-#### Production Build
-```bash
-npm run app:build
-```
-The built application will be available in the `release` folder.
+4. **Run in development**
+   ```bash
+   npm run dev
+   ```
+
+5. **Build for production**
+   ```bash
+   npm run build
+   ```
+
+### Verification
+- Launch the app and check for green "Ollama Connected" status
+- Use the test component (in development mode) to verify AI responses
+- Take a screenshot and process it to test the full pipeline
 
 ## 🎮 How to Use
 

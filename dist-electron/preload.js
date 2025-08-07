@@ -71,8 +71,36 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     // Audio processing
     analyzeAudioFromBase64: (data, mimeType) => electron_1.ipcRenderer.invoke('analyze-audio-base64', data, mimeType),
     analyzeAudioFile: (path) => electron_1.ipcRenderer.invoke('analyze-audio-file', path),
-    // Ask functionality
-    askQuestion: (question) => electron_1.ipcRenderer.invoke('ask-question', question),
+    // Universal AI functionality
+    askQuestion: (question, options) => electron_1.ipcRenderer.invoke('ask-question', question, options),
+    processImages: (imagePaths, options) => electron_1.ipcRenderer.invoke('process-images', imagePaths, options),
+    processAudio: (audioData, options) => electron_1.ipcRenderer.invoke('process-audio', audioData, options),
+    getAvailableModels: () => electron_1.ipcRenderer.invoke('get-available-models'),
+    // Ollama-specific functionality
+    processInterview: (additionalContext) => electron_1.ipcRenderer.invoke('process-interview', additionalContext),
+    checkOllamaConnection: () => electron_1.ipcRenderer.invoke('check-ollama-connection'),
+    // Processing status events
+    onProcessingStatus: (callback) => {
+        const subscription = (_, status) => callback(status);
+        electron_1.ipcRenderer.on('processing-status', subscription);
+        return () => electron_1.ipcRenderer.removeListener('processing-status', subscription);
+    },
+    // Streaming response events
+    onStreamingResponse: (callback) => {
+        const subscription = (_, partialText) => callback(partialText);
+        electron_1.ipcRenderer.on('streaming-response', subscription);
+        return () => electron_1.ipcRenderer.removeListener('streaming-response', subscription);
+    },
+    onStreamingComplete: (callback) => {
+        const subscription = (_, finalText) => callback(finalText);
+        electron_1.ipcRenderer.on('streaming-complete', subscription);
+        return () => electron_1.ipcRenderer.removeListener('streaming-complete', subscription);
+    },
+    onStreamingError: (callback) => {
+        const subscription = (_, error) => callback(error);
+        electron_1.ipcRenderer.on('streaming-error', subscription);
+        return () => electron_1.ipcRenderer.removeListener('streaming-error', subscription);
+    },
     // Window movement
     moveWindowLeft: () => electron_1.ipcRenderer.invoke('move-window-left'),
     moveWindowRight: () => electron_1.ipcRenderer.invoke('move-window-right'),
@@ -82,4 +110,12 @@ electron_1.contextBridge.exposeInMainWorld('electronAPI', {
     solutionStart: () => electron_1.ipcRenderer.invoke('solution-start'),
     // Platform info
     platform: process.platform,
+    // Enhanced solution processing
+    startSolutionProcessing: () => electron_1.ipcRenderer.invoke('solution-start'),
+    // Remove streaming event listeners
+    removeStreamingListeners: () => {
+        electron_1.ipcRenderer.removeAllListeners('streaming-response');
+        electron_1.ipcRenderer.removeAllListeners('streaming-complete');
+        electron_1.ipcRenderer.removeAllListeners('streaming-error');
+    },
 });

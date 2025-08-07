@@ -15,6 +15,7 @@ import {
 import { ProblemStatementData } from "../types/solutions"
 import { AudioResult } from "../types/audio"
 import SolutionCommands from "../components/Solutions/SolutionCommands"
+import StreamingSolution from "../components/Solutions/StreamingSolution"
 import Debug from "./Debug"
 import { logger } from "../utils/logger"
 import { useErrorHandler } from "../hooks/useErrorHandler"
@@ -55,14 +56,17 @@ export const ContentSection = ({
     )}
   </div>
 )
+
 const SolutionSection = ({
   title,
   content,
-  isLoading
+  isLoading,
+  isStreaming = false
 }: {
   title: string
   content: React.ReactNode
   isLoading: boolean
+  isStreaming?: boolean
 }) => (
   <div className="space-y-2">
     <h2 className="text-[13px] font-medium text-white tracking-wide">
@@ -81,6 +85,17 @@ const SolutionSection = ({
           </p>
         </div>
       </div>
+    ) : isStreaming ? (
+      <StreamingSolution
+        isActive={true}
+        className="w-full"
+        onComplete={(finalText) => {
+          logger.log('Streaming completed:', finalText.substring(0, 100) + '...');
+        }}
+        onError={(error) => {
+          logger.error('Streaming error:', error);
+        }}
+      />
     ) : (
       <div className="w-full">
         <SyntaxHighlighter
@@ -149,6 +164,7 @@ export const ComplexitySection = ({
 interface SolutionsProps {
   setView: React.Dispatch<React.SetStateAction<"queue" | "solutions" | "debug">>
 }
+
 const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
   const queryClient = useQueryClient()
   const contentRef = useRef<HTMLDivElement>(null)
@@ -171,6 +187,7 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
     null
   )
   const [customContent, setCustomContent] = useState<string | null>(null)
+  const [isStreamingActive, setIsStreamingActive] = useState(false)
 
   const [toastOpen, setToastOpen] = useState(false)
   const [toastMessage, setToastMessage] = useState<ToastMessage>({
@@ -230,6 +247,7 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
       window.electronAPI.onResetView(() => {
         // Set resetting state first
         setIsResetting(true)
+        setIsStreamingActive(false)
 
         // Clear the queries
         queryClient.removeQueries(["solution"])
@@ -251,6 +269,7 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
         setSpaceComplexityData(null)
         setCustomContent(null)
         setAudioResult(null)
+        setIsStreamingActive(true) // Enable streaming mode
 
         // Start audio recording from user's microphone
         try {
@@ -303,6 +322,7 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
       }),
       //if there was an error processing the initial solution
       window.electronAPI.onSolutionError((error: string) => {
+        setIsStreamingActive(false) // Disable streaming on error
         showToast(
           "Processing Failed",
           "There was an error processing your extra screenshots.",
@@ -326,6 +346,8 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
       }),
       //when the initial solution is generated, we'll set the solution data to that
       window.electronAPI.onSolutionSuccess((data) => {
+        setIsStreamingActive(false) // Disable streaming when complete
+        
         if (!data?.solution) {
           logger.warn('Received empty or invalid solution data', data);
           showToast(
@@ -335,8 +357,6 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
           );
           return
         }
-
-
 
         const solutionData = {
           code: data.solution.code,
@@ -361,8 +381,6 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
       }),
       //the first time debugging works, we'll set the view to debug and populate the cache with the data
       window.electronAPI.onDebugSuccess((data) => {
-
-
         queryClient.setQueryData(["new_solution"], data.solution)
         setDebugProcessing(false)
       }),
@@ -514,7 +532,7 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
                       isLoading={!problemStatementData}
                     />
                     {/* Show loading state when waiting for solution */}
-                    {problemStatementData && !solutionData && (
+                    {problemStatementData && !solutionData && !isStreamingActive && (
                       <div className="mt-6 p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-lg border border-blue-500/20">
                         <div className="flex items-center gap-4">
                           <div className="flex space-x-1">
@@ -537,8 +555,9 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
                         </div>
                       </div>
                     )}
-                    {/* Solution Sections (legacy, only for non-manual) */}
-                    {solutionData && (
+                    
+                    {/* Solution Sections with streaming support */}
+                    {(solutionData || isStreamingActive) && (
                       <>
                         <ContentSection
                           title="Analysis"
@@ -559,14 +578,17 @@ const Solutions: React.FC<SolutionsProps> = ({ setView }) => {
                               </div>
                             )
                           }
-                          isLoading={!thoughtsData}
+                          isLoading={!thoughtsData && !isStreamingActive}
                         />
+                        
                         <SolutionSection
                           title={problemStatementData?.output_format?.subtype === "voice" ? "Response" : "Solution"}
                           content={solutionData}
-                          isLoading={!solutionData}
+                          isLoading={!solutionData && !isStreamingActive}
+                          isStreaming={isStreamingActive}
                         />
-                        {problemStatementData?.output_format?.subtype !== "voice" && (
+                        
+                        {problemStatementData?.output_format?.subtype !== "voice" && !isStreamingActive && (
                           <ComplexitySection
                             timeComplexity={timeComplexityData}
                             spaceComplexity={spaceComplexityData}

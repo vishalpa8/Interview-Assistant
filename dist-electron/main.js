@@ -32,25 +32,17 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 const electron_1 = require("electron");
 const path = __importStar(require("path"));
 const dotenv = __importStar(require("dotenv"));
-const axios_1 = __importDefault(require("axios"));
-const https = __importStar(require("https"));
 const fs = __importStar(require("fs"));
 const uuid_1 = require("uuid");
+const ollama_service_1 = require("./ollama-service");
+const universal_ai_service_1 = require("./universal-ai-service");
 const screenshot = require("screenshot-desktop");
 // Load environment variables
 dotenv.config();
-// Configure axios to handle SSL certificate issues
-const httpsAgent = new https.Agent({
-    rejectUnauthorized: false, // Allow self-signed certificates
-});
-axios_1.default.defaults.httpsAgent = httpsAgent;
 // Simple development detection
 const isDev = process.env.NODE_ENV === "development" || !electron_1.app.isPackaged;
 // Smart logging for main process
@@ -290,100 +282,249 @@ function setupIpcHandlers() {
             };
         }
     });
-    // Audio processing (mock for now)
+    // Audio processing using Ollama service
     electron_1.ipcMain.handle("analyze-audio-base64", async (event, data, mimeType) => {
-        // Mock implementation
-        return {
-            text: "Audio analysis not implemented yet",
-            timestamp: Date.now(),
-        };
-    });
-    electron_1.ipcMain.handle("analyze-audio-file", async (event, path) => {
-        // Mock implementation
-        return {
-            text: "Audio file analysis not implemented yet",
-            timestamp: Date.now(),
-        };
-    });
-    // Ask functionality using Gemini AI with axios
-    electron_1.ipcMain.handle("ask-question", async (event, question) => {
         try {
-            const apiKey = process.env.GEMINI_API_KEY;
-            if (!apiKey) {
-                return {
-                    success: false,
-                    error: "GEMINI_API_KEY not found. Please set up your API key in environment variables.",
-                };
-            }
-            const prompt = `Answer this question directly and naturally, like a knowledgeable friend would. Be precise and accurate without unnecessary explanations or AI-like language. Keep it conversational and human-like. Don't start with phrases like "Here's how" or "Let me explain" or "The answer is". Just give the answer naturally:
-
-${question}`;
-            // Use axios to make the API call directly
-            const response = await axios_1.default.post(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-                contents: [
-                    {
-                        parts: [
-                            {
-                                text: prompt,
-                            },
-                        ],
-                    },
-                ],
-            }, {
-                headers: {
-                    "Content-Type": "application/json",
+            const result = await ollama_service_1.electronOllamaService.transcribeAudio('');
+            return result;
+        }
+        catch (error) {
+            return {
+                text: "Audio transcription failed",
+                timestamp: Date.now(),
+            };
+        }
+    });
+    electron_1.ipcMain.handle("analyze-audio-file", async (event, audioPath) => {
+        try {
+            const result = await ollama_service_1.electronOllamaService.transcribeAudio(audioPath);
+            return result;
+        }
+        catch (error) {
+            return {
+                text: "Audio transcription failed",
+                timestamp: Date.now(),
+            };
+        }
+    });
+    // Universal AI functionality with streaming support
+    electron_1.ipcMain.handle("ask-question", async (event, question, options = {}) => {
+        const requestId = (0, uuid_1.v4)();
+        try {
+            // Set up streaming callbacks
+            universal_ai_service_1.universalAIService.setStreamingCallback(requestId, {
+                onChunk: (partialText) => {
+                    if (mainWindow) {
+                        mainWindow.webContents.send('streaming-response', partialText);
+                    }
                 },
-                timeout: 30000, // 30 second timeout
-                httpsAgent: httpsAgent, // Use the configured HTTPS agent
-                validateStatus: function (status) {
-                    return status >= 200 && status < 300; // Accept only success status codes
+                onProgress: (progress) => {
+                    if (mainWindow) {
+                        mainWindow.webContents.send('processing-status', {
+                            stage: 'generating_solution',
+                            message: 'Generating response...',
+                            progress
+                        });
+                    }
                 },
+                onComplete: (finalText) => {
+                    if (mainWindow) {
+                        mainWindow.webContents.send('streaming-complete', finalText);
+                    }
+                },
+                onError: (error) => {
+                    if (mainWindow) {
+                        mainWindow.webContents.send('streaming-error', error);
+                    }
+                }
             });
-            const text = response.data.candidates[0].content.parts[0].text;
+            // Set up Ollama streaming callback
+            ollama_service_1.electronOllamaService.setStreamingCallback((partialText) => {
+                if (mainWindow) {
+                    mainWindow.webContents.send('streaming-response', partialText);
+                }
+            });
+            const modelName = options.model || 'llama3.2';
+            // Use Ollama service directly for better streaming support
+            const response = await ollama_service_1.electronOllamaService.askQuestion(question, options.context);
+            // Send completion event
+            if (mainWindow) {
+                mainWindow.webContents.send('streaming-complete', response.text);
+            }
             return {
                 success: true,
                 answer: {
-                    text: text,
-                    timestamp: Date.now(),
+                    text: response.text,
+                    timestamp: response.timestamp,
                 },
+                metadata: response.metadata
             };
         }
         catch (error) {
-            let errorMessage = "Unknown error occurred";
-            if (axios_1.default.isAxiosError(error)) {
-                if (error.code === "ENOTFOUND") {
-                    errorMessage =
-                        "Network connection failed. Please check your internet connection.";
-                }
-                else if (error.code === "ECONNREFUSED") {
-                    errorMessage =
-                        "Connection refused. Please check your network settings.";
-                }
-                else if (error.code === "CERT_HAS_EXPIRED" ||
-                    error.message.includes("certificate")) {
-                    errorMessage =
-                        "SSL certificate issue. This might be due to corporate firewall or proxy settings.";
-                }
-                else if (error.code === "ETIMEDOUT" ||
-                    error.message.includes("timeout")) {
-                    errorMessage = "Request timed out. Please try again.";
-                }
-                else if (error.response?.status === 401) {
-                    errorMessage = "Invalid API key. Please check your GEMINI_API_KEY.";
-                }
-                else if (error.response?.status === 403) {
-                    errorMessage =
-                        "API access forbidden. Please check your API key permissions.";
-                }
-                else if (error.response && error.response.status >= 500) {
-                    errorMessage = "Google API server error. Please try again later.";
-                }
-                else {
-                    errorMessage = `Network error: ${error.message}`;
-                }
+            if (mainWindow) {
+                mainWindow.webContents.send('streaming-error', error instanceof Error ? error.message : 'Unknown error occurred');
             }
-            else if (error instanceof Error) {
-                errorMessage = error.message;
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error occurred',
+            };
+        }
+    });
+    // Process images with universal AI service
+    electron_1.ipcMain.handle("process-images", async (event, imagePaths, options = {}) => {
+        const requestId = (0, uuid_1.v4)();
+        try {
+            universal_ai_service_1.universalAIService.setStreamingCallback(requestId, {
+                onChunk: (partialText) => {
+                    if (mainWindow) {
+                        mainWindow.webContents.send('streaming-response', partialText);
+                    }
+                },
+                onComplete: (finalText) => {
+                    if (mainWindow) {
+                        mainWindow.webContents.send('streaming-complete', finalText);
+                    }
+                },
+                onError: (error) => {
+                    if (mainWindow) {
+                        mainWindow.webContents.send('streaming-error', error);
+                    }
+                }
+            });
+            const modelName = options.model || 'llama3.2-vision';
+            const response = await universal_ai_service_1.universalAIService.processRequest({
+                type: 'image',
+                content: options.prompt || 'Analyze these images',
+                images: imagePaths,
+                context: options.context
+            }, modelName, requestId);
+            return {
+                success: true,
+                result: response
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error occurred'
+            };
+        }
+    });
+    // Process audio with universal AI service
+    electron_1.ipcMain.handle("process-audio", async (event, audioData, options = {}) => {
+        const requestId = (0, uuid_1.v4)();
+        try {
+            universal_ai_service_1.universalAIService.setStreamingCallback(requestId, {
+                onChunk: (partialText) => {
+                    if (mainWindow) {
+                        mainWindow.webContents.send('streaming-response', partialText);
+                    }
+                },
+                onComplete: (finalText) => {
+                    if (mainWindow) {
+                        mainWindow.webContents.send('streaming-complete', finalText);
+                    }
+                },
+                onError: (error) => {
+                    if (mainWindow) {
+                        mainWindow.webContents.send('streaming-error', error);
+                    }
+                }
+            });
+            const modelName = options.model || 'whisper';
+            const response = await universal_ai_service_1.universalAIService.processRequest({
+                type: 'audio',
+                content: 'Transcribe this audio',
+                audioData: audioData,
+                context: options.context
+            }, modelName, requestId);
+            return {
+                success: true,
+                result: response
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error occurred'
+            };
+        }
+    });
+    // Get available AI models
+    electron_1.ipcMain.handle("get-available-models", async () => {
+        try {
+            const models = universal_ai_service_1.universalAIService.getAvailableModels();
+            return {
+                success: true,
+                models
+            };
+        }
+        catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Unknown error occurred'
+            };
+        }
+    });
+    // Process interview screenshots using Ollama
+    electron_1.ipcMain.handle("process-interview", async (event, additionalContext) => {
+        try {
+            if (screenshotStorage.length === 0) {
+                return {
+                    success: false,
+                    error: "No screenshots available for analysis",
+                };
+            }
+            // Set up status callback
+            ollama_service_1.electronOllamaService.setStatusCallback((status) => {
+                if (mainWindow) {
+                    mainWindow.webContents.send('processing-status', status);
+                }
+            });
+            // Set up streaming callback for real-time updates
+            ollama_service_1.electronOllamaService.setStreamingCallback((partialText) => {
+                if (mainWindow) {
+                    mainWindow.webContents.send('streaming-response', partialText);
+                }
+            });
+            // Send initial status
+            if (mainWindow) {
+                mainWindow.webContents.send('solution-start');
+            }
+            const screenshotPaths = screenshotStorage.map(s => s.path);
+            const response = await ollama_service_1.electronOllamaService.processInterviewQuestion(screenshotPaths, additionalContext);
+            // Send streaming complete event
+            if (mainWindow) {
+                mainWindow.webContents.send('streaming-complete', response.text);
+            }
+            // Format response for Solutions component
+            const formattedSolution = {
+                solution: {
+                    code: response.text, // The full AI response as code/solution
+                    thoughts: [
+                        "Analyzed screenshots using llama3.2-vision",
+                        "Generated comprehensive solution using llama3.2-vision",
+                        `Processing completed in ${response.metadata?.processingTime || 0}ms`
+                    ],
+                    time_complexity: "Analysis included in solution",
+                    space_complexity: "Analysis included in solution"
+                }
+            };
+            // Send success event
+            if (mainWindow) {
+                mainWindow.webContents.send('solution-success', formattedSolution);
+            }
+            return {
+                success: true,
+                result: response,
+            };
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+            // Send error event
+            if (mainWindow) {
+                mainWindow.webContents.send('streaming-error', errorMessage);
+                mainWindow.webContents.send('solution-error', errorMessage);
             }
             return {
                 success: false,
@@ -413,14 +554,33 @@ ${question}`;
             mainWindow.hide();
         }
     });
-    electron_1.ipcMain.handle('solution-start', () => {
+    electron_1.ipcMain.handle('solution-start', async () => {
         if (mainWindow) {
             if (screenshotStorage.length > 0) {
-                mainWindow.webContents.send('solution-start');
+                // Start processing with Ollama
+                try {
+                    await electron_1.ipcMain.emit('process-interview', null, '');
+                }
+                catch (error) {
+                    mainWindow.webContents.send('solution-error', 'Failed to start processing');
+                }
             }
             else {
                 mainWindow.webContents.send('processing-no-screenshots');
             }
+        }
+    });
+    // Check Ollama connection
+    electron_1.ipcMain.handle('check-ollama-connection', async () => {
+        try {
+            const isConnected = await ollama_service_1.electronOllamaService.checkConnection();
+            return { success: isConnected };
+        }
+        catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Connection failed'
+            };
         }
     });
 }
@@ -451,10 +611,45 @@ function setupGlobalShortcuts() {
         }
     });
     // Solve problem (Ctrl+Enter) - as shown in tooltip
-    electron_1.globalShortcut.register("CommandOrControl+Return", () => {
+    electron_1.globalShortcut.register("CommandOrControl+Return", async () => {
         if (mainWindow) {
             if (screenshotStorage.length > 0) {
-                mainWindow.webContents.send("solution-start");
+                // Start processing with Ollama
+                try {
+                    const screenshotPaths = screenshotStorage.map(s => s.path);
+                    ollama_service_1.electronOllamaService.setStatusCallback((status) => {
+                        if (mainWindow) {
+                            mainWindow.webContents.send('processing-status', status);
+                        }
+                    });
+                    // Set up streaming callback for real-time updates
+                    ollama_service_1.electronOllamaService.setStreamingCallback((partialText) => {
+                        if (mainWindow) {
+                            mainWindow.webContents.send('streaming-response', partialText);
+                        }
+                    });
+                    mainWindow.webContents.send('solution-start');
+                    const response = await ollama_service_1.electronOllamaService.processInterviewQuestion(screenshotPaths);
+                    // Send streaming complete event
+                    mainWindow.webContents.send('streaming-complete', response.text);
+                    // Format response for Solutions component
+                    const formattedSolution = {
+                        solution: {
+                            code: response.text,
+                            thoughts: [
+                                "Analyzed screenshots using llama3.2-vision",
+                                "Generated comprehensive solution using llama3.2",
+                                `Processing completed in ${response.metadata?.processingTime || 0}ms`
+                            ],
+                            time_complexity: "Analysis included in solution",
+                            space_complexity: "Analysis included in solution"
+                        }
+                    };
+                    mainWindow.webContents.send('solution-success', formattedSolution);
+                }
+                catch (error) {
+                    mainWindow.webContents.send('solution-error', error instanceof Error ? error.message : 'Processing failed');
+                }
             }
             else {
                 mainWindow.webContents.send("processing-no-screenshots");

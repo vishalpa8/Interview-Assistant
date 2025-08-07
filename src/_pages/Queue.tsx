@@ -145,7 +145,6 @@ const Queue: React.FC<QueueProps> = ({ setView }) => {
           />
           <QueueCommands
             screenshots={screenshots}
-            onTooltipVisibilityChange={handleTooltipVisibilityChange}
           />
         </div>
       </div>

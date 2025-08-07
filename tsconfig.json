@@ -15,6 +15,6 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true
   },
-  "include": ["src"], // Only React source files
+  "include": ["src", "src/types", "src/types/electron.d.ts"], // React source files and type definitions
   "references": [{ "path": "./tsconfig.node.json" }]
 }
